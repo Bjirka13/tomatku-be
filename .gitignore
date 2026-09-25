@@ -1,0 +1,8 @@
+# Environment and secrets
+.env
+.venv/
+
+# Python-generated cache
+__pycache__/
+*.py[cod]
+*$py.class
