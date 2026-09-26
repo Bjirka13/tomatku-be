@@ -13,6 +13,7 @@ class ModelService:
 
     @staticmethod
     def _load_model() -> Any:
+        """Import the inference package only when loading the configured model."""
         from importlib import import_module
 
         yolo_class = import_module("ultralytics").YOLO
@@ -24,6 +25,7 @@ class ModelService:
         return yolo_class(str(model_path))
 
     def predict(self, image: np.ndarray) -> tuple[str, float, list[dict[str, Any]]]:
+        """Normalize model labels and return all boxes plus the strongest prediction."""
         results = self.model.predict(source=image, verbose=False)
         boxes: list[dict[str, Any]] = []
 

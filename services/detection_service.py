@@ -13,20 +13,21 @@ from models.validation import (
     SeverityLevelType,
 )
 from services.model_service import ModelService
+from services.image_input import read_image_input
 from services.severity_service import SeverityService
+from services.storage_service import StorageService
 
 
 class DetectionService:
-    def __init__(self, repository: DetectionRepository | None = None) -> None:
+    def __init__(
+        self,
+        repository: DetectionRepository | None = None,
+        storage_service: StorageService | None = None,
+    ) -> None:
         self.repository = repository or DetectionRepository()
         self.model_service = ModelService()
         self.severity_service = SeverityService()
-
-    def _load_image_from_path(self, image_path: str) -> np.ndarray:
-        image = cv2.imread(image_path, cv2.IMREAD_COLOR)
-        if image is None:
-            raise ValueError(f"Unable to read image from path: {image_path}")
-        return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        self.storage_service = storage_service
 
     def _normalize_model_output(
         self,
@@ -35,6 +36,7 @@ class DetectionService:
         confidence_pct: float = 0.0,
         boxes: list[dict[str, Any]] | None = None,
     ) -> DetectionResult:
+        """Enforce API labels and severity defaults before building the response model."""
         classification = fallback_classification or "unknown"
         severity_level = raw_result.get("severity_level")
         severity_pct = raw_result.get("severity_pct")
@@ -66,19 +68,13 @@ class DetectionService:
         )
 
     def predict_from_image(self, payload: DetectionInput) -> DetectionResult:
-        if payload.image_path:
-            image = self._load_image_from_path(payload.image_path)
-        elif payload.image_base64:
-            import base64
-
-            image_bytes = base64.b64decode(payload.image_base64)
-            image_array = np.frombuffer(image_bytes, dtype=np.uint8)
-            image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
-            if image is None:
-                raise ValueError("Unable to decode base64 image")
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        else:
-            raise ValueError("Either image_path or image_base64 must be provided")
+        """Decode either supported input form and use the strongest box for severity."""
+        image_input = read_image_input(payload)
+        image_array = np.frombuffer(image_input.data, dtype=np.uint8)
+        image_bgr = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+        if image_bgr is None:
+            raise ValueError("Unable to decode image data")
+        image = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
 
         classification, confidence_pct, boxes = self.model_service.predict(image)
         best_box = max(
@@ -135,9 +131,18 @@ class DetectionService:
         }
 
     def process_image(self, payload: DetectionInput) -> dict[str, Any]:
+        """Delete the uploaded object if saving its prediction fails."""
         prediction = self.predict_from_image(payload)
-        prediction.image_path = payload.image_path
-        saved = self.save_prediction(prediction, image_path=payload.image_path)
+        storage_service = self.storage_service or StorageService()
+        uploaded_image = storage_service.upload_image(payload)
+        prediction.image_path = uploaded_image.public_url
+
+        try:
+            saved = self.save_prediction(prediction, image_path=uploaded_image.public_url)
+        except Exception:
+            storage_service.delete_image(uploaded_image.object_path)
+            raise
+
         return {"prediction": prediction.model_dump(), **saved}
 
 

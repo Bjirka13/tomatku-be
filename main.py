@@ -4,6 +4,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.routes.history import router as history_router
 from api.routes.predict import router as detection_router
 from config import settings
 from database.connection import DatabaseConnection
@@ -27,6 +28,7 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     async def health_check() -> dict[str, str]:
+        """Report database availability separately from API process health."""
         try:
             DatabaseConnection().execute("SELECT 1;", fetch=True)
             db_status = "ok"
@@ -36,6 +38,7 @@ def create_app() -> FastAPI:
         return {"status": "ok", "service": "tomatku-be", "database": db_status}
 
     app.include_router(detection_router)
+    app.include_router(history_router)
     return app
 
 

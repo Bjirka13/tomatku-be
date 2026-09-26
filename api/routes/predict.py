@@ -13,6 +13,7 @@ service = DetectionService()
 
 @router.post("/detect")
 async def detect_leaf(payload: DetectionInput) -> dict[str, Any]:
+    """Translate invalid input to 400 and unexpected inference failures to 500."""
     try:
         result = service.process_image(payload)
         return {"status": "success", "data": result}

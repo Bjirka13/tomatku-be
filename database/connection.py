@@ -15,6 +15,7 @@ class DatabaseConnection:
 
     @contextmanager
     def session(self) -> Iterator[Any]:
+        """Close the connection even when the caller's query raises."""
         connection = psycopg2.connect(self.dsn, cursor_factory=RealDictCursor)
         try:
             yield connection
@@ -22,6 +23,7 @@ class DatabaseConnection:
             connection.close()
 
     def execute(self, query: str, params: tuple[Any, ...] = (), fetch: bool = False):
+        """Execute one committed statement; fetched rows use dictionary columns."""
         with self.session() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(query, params)

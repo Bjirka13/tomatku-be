@@ -10,6 +10,7 @@ from config import settings
 
 class SeverityService:
     def __init__(self) -> None:
+        # Load the configured pipeline without coupling it to this service
         pipeline_path = settings.resolve_path(settings.PIPELINE_PATH)
         if not pipeline_path.exists():
             raise FileNotFoundError(f"Pipeline file not found: {pipeline_path}")
@@ -31,6 +32,7 @@ class SeverityService:
         classification: str,
         bounding_box: tuple[float, float, float, float] | None = None,
     ) -> dict[str, Any]:
+        """Delegate severity calculation to the external pipeline."""
         return self.pipeline.analyze(
             image,
             classification=classification,

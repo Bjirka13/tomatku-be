@@ -39,6 +39,7 @@ class ExternalSeverityPipeline:
     """Calculate symptom area and database-compatible severity."""
 
     def __init__(self, config: dict[str, Any] | None = None) -> None:
+        """Preserve an explicitly supplied config, including an intentionally empty one."""
         self.config = config if config is not None else DEFAULT_CONFIG
 
     def _crop_image(
@@ -46,6 +47,7 @@ class ExternalSeverityPipeline:
         image_rgb: np.ndarray,
         bounding_box: tuple[float, float, float, float] | None = None,
     ) -> np.ndarray:
+        """Clamp crop coordinates to the image; invalid or absent crops use the full image."""
         crop = bounding_box if bounding_box is not None else self.config.get("crop")
 
         if crop is None:
@@ -65,6 +67,7 @@ class ExternalSeverityPipeline:
 
     @staticmethod
     def _largest_component(mask: np.ndarray) -> np.ndarray:
+        """Keep the largest foreground blob; connected-component label zero is background."""
         num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(
             mask,
             connectivity=8,
@@ -78,6 +81,7 @@ class ExternalSeverityPipeline:
 
     @staticmethod
     def _normalize_classification(classification: str | int | None) -> str | None:
+        """Map known model IDs and spelling variants to the pipeline's canonical labels."""
         if classification is None:
             return None
 
@@ -100,6 +104,7 @@ class ExternalSeverityPipeline:
         classification: str | int | None = None,
         bounding_box: tuple[float, float, float, float] | None = None,
     ) -> dict[str, Any]:
+        """Return no severity for healthy leaves; otherwise apply thresholds to leaf-area percentage."""
         normalized_classification = self._normalize_classification(classification)
         image = self._crop_image(image_rgb, bounding_box)
         image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)

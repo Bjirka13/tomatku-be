@@ -49,6 +49,7 @@ class DetectionRepository:
         return str(result[0]["id"])
 
     def get_scan_history(self) -> list[dict[str, Any]]:
+        """Keep scans without detections in history, with their detection fields empty."""
         query = """
             SELECT s.id AS scan_id,
                    d.id AS detection_id,

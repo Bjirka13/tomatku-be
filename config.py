@@ -8,6 +8,7 @@ ENV_FILE = BASE_DIR / ".env"
 
 
 def _load_env_file() -> None:
+    """Load .env defaults without overriding values already set by the process."""
     if not ENV_FILE.exists():
         return
 
@@ -35,6 +36,12 @@ class Settings:
     DB_PASSWORD: str = os.getenv("DB_PASSWORD", "")
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
     SUPABASE_DATABASE_URL: str = os.getenv("SUPABASE_DATABASE_URL", "")
+    SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
+    SUPABASE_SERVICE_ROLE_KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    SUPABASE_STORAGE_BUCKET: str = os.getenv("SUPABASE_STORAGE_BUCKET", "tomatku-images")
+    MAX_IMAGE_SIZE_BYTES: int = int(
+        os.getenv("MAX_IMAGE_SIZE_BYTES", "").strip() or "5000000"
+    )
 
     MODEL_PATH: Path = Path(os.getenv("MODEL_PATH", "artifact/best.pt"))
     PIPELINE_PATH: Path = Path(
@@ -42,6 +49,7 @@ class Settings:
     )
 
     def resolve_path(self, path: Path) -> Path:
+        """Resolve relative asset paths from the repository root, not the cwd."""
         if path.is_absolute():
             return path
         return BASE_DIR / path
