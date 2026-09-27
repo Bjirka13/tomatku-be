@@ -10,6 +10,14 @@ SeverityLevelType = Literal["ringan", "sedang", "parah"] | None
 
 
 class DetectionInput(BaseModel):
+    mode: Literal["capture", "realtime"] = Field(
+        default="capture",
+        description="Whether this request is a one-off capture or a realtime frame",
+    )
+    stream_id: str | None = Field(
+        default=None,
+        description="Stable identifier for the realtime camera stream",
+    )
     image_path: str | None = Field(
         default=None,
         description="Path to an image file accessible by the backend",
@@ -27,6 +35,12 @@ class DetectionInput(BaseModel):
             raise ValueError(
                 "Provide exactly one non-empty image_path or image_base64"
             )
+        if self.mode == "realtime":
+            if self.stream_id is None or not self.stream_id.strip():
+                raise ValueError("stream_id is required for realtime detection")
+            self.stream_id = self.stream_id.strip()
+        elif self.stream_id is not None:
+            raise ValueError("stream_id is only allowed for realtime detection")
         return self
 
 # Expacted Detection Output
