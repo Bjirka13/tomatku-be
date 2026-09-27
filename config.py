@@ -42,6 +42,9 @@ class Settings:
     MAX_IMAGE_SIZE_BYTES: int = int(
         os.getenv("MAX_IMAGE_SIZE_BYTES", "").strip() or "5000000"
     )
+    REALTIME_CAPTURE_COOLDOWN_SECONDS: float = float(
+        os.getenv("REALTIME_CAPTURE_COOLDOWN_SECONDS", "3")
+    )
 
     MODEL_PATH: Path = Path(os.getenv("MODEL_PATH", "artifact/best.pt"))
     PIPELINE_PATH: Path = Path(
