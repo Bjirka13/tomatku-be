@@ -4,9 +4,35 @@ CREATE TABLE IF NOT EXISTS scans (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     ended_at TIMESTAMPTZ,
+    detection_mode TEXT NOT NULL DEFAULT 'capture',
+    stream_id TEXT,
     CONSTRAINT scans_ended_at_after_started_at
-        CHECK (ended_at IS NULL OR ended_at >= started_at)
+        CHECK (ended_at IS NULL OR ended_at >= started_at),
+    CONSTRAINT scans_mode_valid
+        CHECK (detection_mode IN ('capture', 'realtime')),
+    CONSTRAINT scans_stream_valid
+        CHECK (
+            (detection_mode = 'capture' AND stream_id IS NULL)
+            OR (detection_mode = 'realtime' AND stream_id IS NOT NULL AND btrim(stream_id) <> '')
+        )
 );
+
+ALTER TABLE scans
+    ADD COLUMN IF NOT EXISTS detection_mode TEXT NOT NULL DEFAULT 'capture',
+    ADD COLUMN IF NOT EXISTS stream_id TEXT;
+
+ALTER TABLE scans
+    DROP CONSTRAINT IF EXISTS scans_mode_valid,
+    DROP CONSTRAINT IF EXISTS scans_stream_valid;
+
+ALTER TABLE scans
+    ADD CONSTRAINT scans_mode_valid
+        CHECK (detection_mode IN ('capture', 'realtime')),
+    ADD CONSTRAINT scans_stream_valid
+        CHECK (
+            (detection_mode = 'capture' AND stream_id IS NULL)
+            OR (detection_mode = 'realtime' AND stream_id IS NOT NULL AND btrim(stream_id) <> '')
+        );
 
 CREATE TABLE IF NOT EXISTS detection_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -27,8 +53,42 @@ CREATE TABLE IF NOT EXISTS detection_logs (
         CHECK (severity_pct IS NULL OR (severity_pct >= 0 AND severity_pct <= 100))
 );
 
+CREATE TABLE IF NOT EXISTS realtime_capture_state (
+    stream_id TEXT PRIMARY KEY,
+    last_saved_at TIMESTAMPTZ NOT NULL,
+    claim_token TEXT NOT NULL
+);
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+                WHERE table_schema = current_schema()
+                    AND table_name = 'detection_logs'
+                    AND column_name = 'detection_mode'
+    ) AND EXISTS (
+        SELECT 1 FROM information_schema.columns
+                WHERE table_schema = current_schema()
+                    AND table_name = 'detection_logs'
+                    AND column_name = 'stream_id'
+    ) THEN
+        UPDATE scans AS s
+        SET detection_mode = d.detection_mode,
+            stream_id = d.stream_id
+        FROM detection_logs AS d
+        WHERE d.scan_id = s.id;
+    END IF;
+END $$;
+
+ALTER TABLE detection_logs
+    DROP COLUMN IF EXISTS detection_mode,
+    DROP COLUMN IF EXISTS stream_id;
+
 CREATE INDEX IF NOT EXISTS detection_logs_detected_at_idx
     ON detection_logs (detected_at);
+
+CREATE INDEX IF NOT EXISTS scans_stream_started_at_idx
+    ON scans (stream_id, started_at DESC);
 
 CREATE INDEX IF NOT EXISTS detection_logs_scan_id_idx
     ON detection_logs (scan_id);
