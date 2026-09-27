@@ -5,6 +5,7 @@ from typing import Any, cast
 import cv2
 import numpy as np
 
+from config import settings
 from database.repository import DetectionRepository
 from models.validation import (
     ClassificationType,
@@ -110,8 +111,13 @@ class DetectionService:
         self,
         prediction: DetectionResult,
         image_path: str | None = None,
+        detection_mode: str = "capture",
+        stream_id: str | None = None,
     ) -> dict[str, Any]:
-        scan_id = self.repository.create_scan()
+        scan_id = self.repository.create_scan(
+            detection_mode=detection_mode,
+            stream_id=stream_id,
+        )
         detection_id = self.repository.insert_detection_log(
             scan_id=scan_id,
             classification=prediction.classification,
@@ -121,29 +127,73 @@ class DetectionService:
             severity_pct=prediction.severity_pct,
         )
         return {
-            "scan_id": scan_id,
-            "detection_id": detection_id,
-            "classification": prediction.classification,
-            "confidence_pct": prediction.confidence_pct,
-            "image_path": image_path,
-            "severity_level": prediction.severity_level,
-            "severity_pct": prediction.severity_pct,
+            "scan": {
+                "id": scan_id,
+                "detection_mode": detection_mode,
+                "stream_id": stream_id,
+            },
+            "detection": {
+                "id": detection_id,
+                "classification": prediction.classification,
+                "confidence_pct": prediction.confidence_pct,
+                "image_path": image_path,
+                "severity_level": prediction.severity_level,
+                "severity_pct": prediction.severity_pct,
+            },
         }
 
     def process_image(self, payload: DetectionInput) -> dict[str, Any]:
-        """Delete the uploaded object if saving its prediction fails."""
+        """Filter realtime frames before storing images and detection records."""
         prediction = self.predict_from_image(payload)
-        storage_service = self.storage_service or StorageService()
-        uploaded_image = storage_service.upload_image(payload)
-        prediction.image_path = uploaded_image.public_url
+        claim_token = None
+        if payload.mode == "realtime":
+            if payload.stream_id is None:
+                raise ValueError("stream_id is required for realtime detection")
+            claim_token = self.repository.try_claim_realtime_capture(
+                payload.stream_id,
+                settings.REALTIME_CAPTURE_COOLDOWN_SECONDS,
+            )
+            if claim_token is None:
+                return {
+                    "prediction": prediction.model_dump(),
+                    "saved": False,
+                    "reason": "cooldown",
+                    "scan": {
+                        "detection_mode": payload.mode,
+                        "stream_id": payload.stream_id,
+                    },
+                    "detection": None,
+                }
 
+        storage_service = self.storage_service
+        uploaded_image = None
         try:
-            saved = self.save_prediction(prediction, image_path=uploaded_image.public_url)
+            storage_service = storage_service or StorageService()
+            uploaded_image = storage_service.upload_image(payload)
+            prediction.image_path = uploaded_image.public_url
+            saved = self.save_prediction(
+                prediction,
+                image_path=uploaded_image.public_url,
+                detection_mode=payload.mode,
+                stream_id=payload.stream_id,
+            )
         except Exception:
-            storage_service.delete_image(uploaded_image.object_path)
+            try:
+                if storage_service is not None and uploaded_image is not None:
+                    storage_service.delete_image(uploaded_image.object_path)
+            finally:
+                if claim_token is not None and payload.stream_id is not None:
+                    self.repository.release_realtime_capture(
+                        payload.stream_id,
+                        claim_token,
+                    )
             raise
 
-        return {"prediction": prediction.model_dump(), **saved}
+        return {
+            "prediction": prediction.model_dump(),
+            "saved": True,
+            **saved,
+        }
 
 
 __all__ = ["DetectionService"]
