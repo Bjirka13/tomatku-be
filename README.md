@@ -11,18 +11,52 @@ Backend FastAPI untuk mendeteksi kondisi daun tomat, menghitung tingkat keparaha
 - Perhitungan severity (`ringan`, `sedang`, atau `parah`) dan persentasenya. Untuk klasifikasi `healthy`, severity bernilai `null`.
 - Upload gambar ke Supabase Storage dan penyimpanan hasil deteksi ke database.
 
+## Tech Stack
+
+- Python: 3.14.5
+- FastAPI: `0.136.3`
+- PostgreSQL: 17.11
+- Supabase Storage: `supabase 2.4.0`
+
+Versi dependency Python [`requirements.txt`](requirements.txt)
+
 ## Persiapan
 
-1. Set Up Backend
+### Setup Database
+
+Pastikan PostgreSQL berjalan, lalu dari root repository buat database lokal:
+
+```powershell
+psql -h localhost -p 5432 -U postgres -d postgres -c "CREATE DATABASE tomatku;"
+```
+
+Terapkan schema ke database tersebut:
+
+```powershell
+psql -h localhost -p 5432 -U postgres -d tomatku -f database/init.sql
+```
+
+### Setup Backend
+
+Install dependency Python:
+
+```powershell
 python -m pip install -r requirements.txt
+```
 
-2. Activate Backend Runtime
+Pastikan konfigurasi koneksi database di `.env` sesuai, lalu jalankan backend:
+
+```powershell
 python -m uvicorn main:app --reload --port 8000
+```
 
-3. Validasi Koneksi Database
+Validasi koneksi database:
+
+```powershell
 Invoke-RestMethod http://localhost:8000/health
+```
 
-URL: `http://localhost:8000/docs`.
+Dokumentasi API tersedia di `http://localhost:8000/docs`.
 
 
 ## Endpoint Frontend
