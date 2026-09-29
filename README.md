@@ -13,9 +13,9 @@ Backend FastAPI untuk mendeteksi kondisi daun tomat, menghitung tingkat keparaha
 
 ## Tech Stack
 
-- Python: 3.14.5
+- Python: `3.14.5`
 - FastAPI: `0.136.3`
-- PostgreSQL: 17.11
+- PostgreSQL: `17.11`
 - Supabase Storage: `supabase 2.4.0`
 
 Versi dependency Python [`requirements.txt`](requirements.txt)
