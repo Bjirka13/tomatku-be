@@ -26,7 +26,16 @@ class ModelService:
 
     def predict(self, image: np.ndarray) -> tuple[str, float, list[dict[str, Any]]]:
         """Normalize model labels and return all boxes plus the strongest prediction."""
-        results = self.model.predict(source=image, verbose=False)
+        import torch
+
+        results = self.model.predict(
+            source=image,
+            imgsz=640,
+            conf=0.45,
+            iou=0.5,
+            verbose=False,
+            device=0 if torch.cuda.is_available() else "cpu",
+        )
         boxes: list[dict[str, Any]] = []
 
         for result in results:
