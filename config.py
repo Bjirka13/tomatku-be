@@ -43,7 +43,7 @@ class Settings:
         os.getenv("MAX_IMAGE_SIZE_BYTES", "").strip() or "5000000"
     )
 
-    MODEL_PATH: Path = Path(os.getenv("MODEL_PATH", "artifact/best.pt"))
+    MODEL_PATH: Path = Path(os.getenv("MODEL_PATH", "artifact/best_unknown_v3.pt"))
     PIPELINE_PATH: Path = Path(
         os.getenv("PIPELINE_PATH", "artifact/external_pipeline.py")
     )
