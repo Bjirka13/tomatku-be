@@ -43,10 +43,12 @@ class DetectionService:
 
         if classification not in {"healthy", "early_blight", "unknown"}:
             classification = "unknown"
-
-        if classification == "healthy":
+        
+        """Set severity to None if the classification is healthy or unknown"""
+        if classification in {"healthy", "unknown"}: 
             severity_level = None
             severity_pct = None
+            
         elif severity_level not in {"ringan", "sedang", "parah"}:
             severity_level = "ringan"
             severity_pct = 0.0
@@ -133,6 +135,12 @@ class DetectionService:
     def process_image(self, payload: DetectionInput) -> dict[str, Any]:
         """Delete the uploaded object if saving its prediction fails."""
         prediction = self.predict_from_image(payload)
+        if prediction.classification == "unknown":
+            return {
+                "prediction": prediction.model_dump(),
+                "saved": False,
+            }
+
         storage_service = self.storage_service or StorageService()
         uploaded_image = storage_service.upload_image(payload)
         prediction.image_path = uploaded_image.public_url
