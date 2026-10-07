@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
+# pyrefly: ignore[missing-import]
 import numpy as np
 
+# pyrefly: ignore[missing-import]
 from config import settings
 
 
@@ -26,6 +28,7 @@ class ModelService:
 
     def predict(self, image: np.ndarray) -> tuple[str, float, list[dict[str, Any]]]:
         """Normalize model labels and return all boxes plus the strongest prediction."""
+        # pyrefly: ignore[missing-import]
         import torch
 
         results = self.model.predict(
@@ -68,7 +71,12 @@ class ModelService:
         if not boxes:
             return "unknown", 0.0, []
 
-        best_box = max(boxes, key=lambda item: item["confidence_pct"])
+        # prioritize boxes: first by disease classification, then by confidence percentage
+        def box_priority(item: dict[str, Any]) -> tuple[int, float]:
+                    is_disease = 1 if item["classification"] == "early_blight" else 0
+                    return(is_disease, item["confidence_pct"])
+        
+        best_box = max(boxes, key=box_priority)
         return (
             str(best_box["classification"]),
             float(best_box["confidence_pct"]),
