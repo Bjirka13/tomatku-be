@@ -110,23 +110,35 @@ class ExternalSeverityPipeline:
         image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
         image_hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV)
 
+        """need changes so that the leaf mask and symptom mask are merged first before calculating the severity percentage"""
+        # leaf area
         leaf_mask = cv2.inRange(
             image_hsv,
             np.array(self.config["leaf_hsv_lower"]),
             np.array(self.config["leaf_hsv_upper"]),
         )
 
-        kernel_size = self.config["morphology_kernel_size"]
-        kernel = np.ones((kernel_size, kernel_size), np.uint8)
-        leaf_mask = cv2.morphologyEx(leaf_mask, cv2.MORPH_OPEN, kernel)
-        leaf_mask = cv2.morphologyEx(leaf_mask, cv2.MORPH_CLOSE, kernel)
-        leaf_mask = self._largest_component(leaf_mask)
-
+        # symptom area
         symptom_mask = cv2.inRange(
             image_hsv,
             np.array(self.config["symptom_hsv_lower"]),
             np.array(self.config["symptom_hsv_upper"]),
         )
+
+        # Merge area
+        """Merge the leaf mask and symptom mask"""
+        full_leaf_mask = cv2.bitwise_or(leaf_mask, symptom_mask)
+
+        kernel_size = self.config["morphology_kernel_size"]
+        kernel = np.ones((kernel_size, kernel_size), np.uint8)
+        
+        full_leaf_mask = cv2.morphologyEx(full_leaf_mask, cv2.MORPH_OPEN, kernel)
+        full_leaf_mask = cv2.morphologyEx(full_leaf_mask, cv2.MORPH_CLOSE, kernel)
+        full_leaf_mask = self._largest_component(full_leaf_mask)
+
+        """return the full leaf mask and symptom mask for visualization"""
+        leaf_mask = self._largest_component(full_leaf_mask)
+        
         symptom_mask = cv2.bitwise_and(symptom_mask, leaf_mask)
         symptom_mask = cv2.morphologyEx(symptom_mask, cv2.MORPH_OPEN, kernel)
         symptom_mask = cv2.morphologyEx(symptom_mask, cv2.MORPH_CLOSE, kernel)
